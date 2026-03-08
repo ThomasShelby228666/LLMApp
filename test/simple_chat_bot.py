@@ -4,11 +4,13 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
+# 1) Загрузка переменных окружения
 load_dotenv()
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = os.getenv("OPENROUTER_MODEL_NAME")
 
+# 2) Вызов модели
 model = ChatOpenAI(
     model=MODEL,
     api_key=API_KEY,
@@ -20,16 +22,19 @@ model = ChatOpenAI(
     max_tokens=300
 )
 
+# 3) Создание агента
 agent = create_agent(
     model=model,
     checkpointer=InMemorySaver(),
 )
 
+# 4) Конфигурация
 conf = {"configurable": {"thread_id": "conversation_001"}}
 
 print(f"Введите ваш запрос боту и дождитесь ответа (введите 'выход' для выхода): \n")
 
 while True:
+    # 5) Ввод запроса
     question = input("Вы: ").strip()
 
     if not question:
@@ -39,6 +44,7 @@ while True:
         print("Бот: До свидания!")
         break
 
+    # 5) Получение ответа от модели
     try:
         responce = agent.invoke(
             {"messages": [{"role": "user", "content": question}]},
