@@ -18,9 +18,9 @@ client.create_collection(
 )
 
 sentences = [
-    "Сьешь ещё этих мягких франзцузcких булок и выпей ещё чаю",      # id = 0
-    "В этом предложении все буквы алфавита",         # id = 1
-    "С кайфом покушал  сегодня"    # id = 2
+    "Сьешь ещё этих мягких франзцузcких булок и выпей ещё чаю", # id = 0
+    "В этом предложении все буквы алфавита", # id = 1
+    "С кайфом покушал  сегодня" # id = 2
 ]
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -44,7 +44,7 @@ client.upsert(
 )
 
 query_vec = model.encode(
-    "После шаурмы срать охота", normalize_embeddings=True
+    "После шаурмы охота в тулает", normalize_embeddings=True
 )
 
 hits = client.query_points(
