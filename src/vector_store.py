@@ -7,7 +7,13 @@ class VectorStore:
     """
     Клиент для работы с Qdrant.
     """
-    def __init__(self, collection_name: str, api_key: Optional[str] = None, url:str = "http://localhost:6333"):
+
+    def __init__(
+            self,
+            collection_name: str,
+            api_key: Optional[str] = None,
+            url: str = "http://localhost:6333"
+    ) -> None:
         """
         Конструктор класса.
         """
@@ -17,7 +23,7 @@ class VectorStore:
         )
         self.collection_name = collection_name
 
-    def create_collection(self, vector_size: int):
+    def create_collection(self, vector_size: int) -> None:
         """
         Создаёт коллекцию, если её нет.
         """
@@ -30,7 +36,12 @@ class VectorStore:
                 )
             )
 
-    def upload_vectors(self, vectors: List[List[float]], payloads: List[Dict[str, Any]], ids: List[Any]):
+    def upload_vectors(
+            self,
+            vectors: List[List[float]],
+            payloads: List[Dict[str, Any]],
+            ids: List[Any]
+    ) -> None:
         """
         Загружает векторы с метаданными.
         """
@@ -38,7 +49,12 @@ class VectorStore:
                   for id, vector, payload in zip(ids, vectors, payloads)]
         self.client.upsert(collection_name=self.collection_name, points=points)
 
-    def search_vectors(self, query_vector: List[float], filter: Optional[models.Filter] = None, top_k: int = 5):
+    def search_vectors(
+            self,
+            query_vector: List[float],
+            filter: Optional[models.Filter] = None,
+            top_k: int = 5
+    ) -> Any:
         """
         Поиск похожих векторов.
         """

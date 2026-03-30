@@ -4,29 +4,24 @@ import fitz
 import easyocr
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import qdrant_client
-from qdrant_client.models import PointStruct
-from typing import *
 import hashlib
 import time
 from vector_store import VectorStore
+from typing import *
 
 class PdfScanner:
     """
-
+    Сканер PDF-файлов в директории.
     """
-    def __init__(self, folder):
+    def __init__(self, folder: str) -> None:
         """
-
-        :param path:
+        Инициализация сканера.
         """
         self.folder = Path(folder).resolve()
 
-    def scan(self):
+    def scan(self) -> List[str]:
         """
-
-        :param folder:
-        :return:
+        Рекурсивный поиск всех PDF-файлов в директории.
         """
         paths = []
 
@@ -37,29 +32,22 @@ class PdfScanner:
             paths.append(str(path))
         return paths
 
-# pdf = PdfScanner("../data")
-# print(pdf.scan())
-
-
 class PdfParser:
     """
-
+    Парсер PDF-файлов с поддержкой OCR.
     """
-    def __init__(self, use_ocr=True):
+    def __init__(self, use_ocr: bool = True) -> None:
         """
-
-        :param use_ocr:
+        Инициализация парсера.
         """
         self.use_ocr = use_ocr
         self.reader = None
         if self.use_ocr:
             self.reader = easyocr.Reader(["ru", "en"])
 
-    def parse_file(self, file_path):
+    def parse_file(self, file_path: str) -> Dict[str, Any]:
         """
-
-        :param file_path:
-        :return:
+        Извлечение текста и метаданных из PDF-файла.
         """
         content = ""
         meta = {}
@@ -70,6 +58,7 @@ class PdfParser:
                 page_text = page.get_text().strip()
                 if page_text.strip():
                     content += f"--- Страница {page_num + 1} ---\n{page_text}\n\n"
+
         if len(content.strip()) > 50:
             return {
                 "text": content,
@@ -88,11 +77,9 @@ class PdfParser:
 
         return {"text": content, "meta": meta, "source": "text_layer"}
 
-    def _parse_with_ocr(self, file_path):
+    def _parse_with_ocr(self, file_path: str) -> str:
         """
-
-        :param file_path:
-        :return:
+        Извлечение текста с помощью OCR.
         """
         content = ""
         with fitz.open(file_path) as document:
@@ -111,7 +98,10 @@ class PdfParser:
 
             return content
 
-    def _extract_meta_from_text(self, text: str, existing_meta: dict) -> dict:
+    def _extract_meta_from_text(self, text: str, existing_meta: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Извлечение метаданных из текста с помощью регулярных выражений.
+        """
         meta = existing_meta.copy() if existing_meta else {}
         preview = text[:2000]
 
@@ -146,22 +136,18 @@ class PdfParser:
 
 class TextChunker:
     """
-
+    Разбиение текста на чанки (сегменты) для векторного индексирования.
     """
-    def __init__(self, size=800, overlap=150):
+    def __init__(self, size: int = 800, overlap: int = 150) -> None:
         """
-
-        :param size:
-        :param overlap:
+        Инициализация чанкера.
         """
         self.size = size
         self.overlap = overlap
 
-    def split(self, text):
+    def split(self, text: str) -> List[str]:
         """
-
-        :param text:
-        :return:
+        Разделение текста на чанки с учетом абзацев.
         """
         text = re.sub(r"[ \t]+", " ", text).strip()
 
@@ -214,20 +200,17 @@ class TextChunker:
 
 class LocalEmbedder:
     """
-
+    Локальный эмбеддер для преобразования текста в векторные представления.
     """
-    def __init__(self, model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"):
+    def __init__(self, model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2") -> None:
         """
-
-        :param model:
+        Инициализация эмбеддера.
         """
         self.model = SentenceTransformer(model)
 
-    def encode(self, texts):
+    def encode(self, texts: List[str]) -> List[List[float]]:
         """
-
-        :param texts:
-        :return:
+        Преобразование текстов в векторные эмбеддинги.
         """
         embeddings = self.model.encode(
             texts,
@@ -241,19 +224,21 @@ class LocalEmbedder:
 
 class QdrantUploader:
     """
-
+    Загрузчик векторов в Qdrant коллекцию.
     """
 
-    def __init__(self, collection_name: str, url: str = "http://localhost:6333"):
+    def __init__(self, collection_name: str, url: str = "http://localhost:6333") -> None:
         """
-        Конструктор класса.
+        Инициализация загрузчика.
         """
         self.store = VectorStore(collection_name=collection_name, url=url)
         self.collection_name = collection_name
         self._collection_created = False
 
-    def upload(self, vectors, chunks, metadata_list):
-        """"""
+    def upload(self, vectors: List[List[float]], chunks: List[str], metadata_list: List[Dict[str, Any]]) -> bool:
+        """
+        Загрузка векторов с метаданными в Qdrant.
+        """
         if not self._collection_created and vectors:
             self.store.create_collection(vector_size=len(vectors[0]))
             self._collection_created = True
@@ -269,23 +254,42 @@ class QdrantUploader:
         return True
 
 class ExecutionReporter:
-    def __init__(self):
+    """
+    Отчет выполнения индексации.
+    """
+
+    def __init__(self) -> None:
+        """
+        Инициализация репортера.
+        """
         self.start_time = time.time()
         self.total_files = 0
         self.success_count = 0
         self.errors = []
         self.total_chunks = 0
 
-    def log_success(self):
+    def log_success(self) -> None:
+        """
+        Логирование успешной обработки файла.
+        """
         self.success_count += 1
 
-    def log_error(self, file, reason):
+    def log_error(self, file: str, reason: str) -> None:
+        """
+         Логирование ошибки обработки файла.
+         """
         self.errors.append((file, reason))
 
-    def log_chunks(self, count):
+    def log_chunks(self, count: int) -> None:
+        """
+        Логирование количества созданных чанков.
+        """
         self.total_chunks += count
 
-    def print_summary(self):
+    def print_summary(self) -> None:
+        """
+        Вывод итоговой статистики индексации.
+        """
         duration = time.time() - self.start_time
         print("\n" + "=" * 50)
         print(f"{'ИТОГОВЫЙ ОТЧЕТ ИНДЕКСАЦИИ':^50}")
@@ -305,7 +309,21 @@ class ExecutionReporter:
 
 
 class IndexBuilder:
-    def __init__(self, scanner, parser, chunker, embedder, uploader):
+    """
+    Основной класс построения индекса.
+    """
+
+    def __init__(
+            self,
+            scanner: PdfScanner,
+            parser: PdfParser,
+            chunker: TextChunker,
+            embedder: LocalEmbedder,
+            uploader: QdrantUploader
+    ) -> None:
+        """
+        Инициализация построителя индекса
+        """
         self.scanner = scanner
         self.parser = parser
         self.chunker = chunker
@@ -313,7 +331,10 @@ class IndexBuilder:
         self.uploader = uploader
         self.reporter = ExecutionReporter()
 
-    def run(self):
+    def run(self) -> None:
+        """
+        Запуск процесса индексации всех найденных PDF-файлов
+        """
         files = self.scanner.scan()
         self.reporter.total_files = len(files)
 
@@ -344,6 +365,7 @@ class IndexBuilder:
 
 
 if __name__ == "__main__":
+    # Конфигурация и запуск индексации
     scanner = PdfScanner(folder="../data")
     parser = PdfParser(use_ocr=True)
     chunker = TextChunker(size=800, overlap=150)
