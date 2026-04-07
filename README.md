@@ -1,4 +1,4 @@
-# LLM E-commerce Chatbot
+# LLM application
 
 Комплексное решение на основе языковых моделей, включающее чат-бота для электронной коммерции и систему индексации документов с векторным поиском.
 
@@ -9,7 +9,7 @@
 ### E-commerce Chatbot 
 Интеллектуальный чат-бот для обслуживания клиентов, построенный на LangChain и интегрированный с OpenRouter API.
 
-### PDF Indexing System 
+### RAG System - PDF Indexing System 
 Система для обработки PDF документов, извлечения текста (включая OCR), создания векторных представлений и организации семантического поиска через Qdrant.
 
 
@@ -75,6 +75,7 @@ LLMApplication/
 │       └── orders.json     # База данных заказов
 ├── src/                         # PDF индексация и векторный поиск
 │   ├── build_index.py           # Основной скрипт индексации PDF
+│   ├── rag_chain.py             # Поиск релевантной информации в базе знаний
 │   └── vector_store.py          # Обертка для Qdrant
 ├── test/
 │   ├── simple_chat_bot.py  # Простой тестовый бот
@@ -82,6 +83,7 @@ LLMApplication/
 │   └── test_vector_db.py   # Тесты функциональности Qdrant
 ├── .env                    # Переменные окружения
 ├── .gitignore              # Игнорируемые файлы
+├── config.py               # Файл конфигурации проекта
 ├── docker-compose.yaml     # Для локального развертывания Qdrant
 ├── README.md               # Документация
 └── requirments.txt         # Зависимости Python
