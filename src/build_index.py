@@ -1,5 +1,4 @@
 import re
-from pathlib import Path
 import fitz
 import easyocr
 import numpy as np
@@ -8,6 +7,13 @@ import hashlib
 import time
 from vector_store import VectorStore
 from typing import *
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
+from config import DATA_FOLDER, EMBEDDING_MODEL, QDRANT_COLLECTION, QDRANT_URL, DEVICE
 
 class PdfScanner:
     """
@@ -43,14 +49,13 @@ class PdfParser:
         self.use_ocr = use_ocr
         self.reader = None
         if self.use_ocr:
-            self.reader = easyocr.Reader(["ru", "en"])
+            self.reader = easyocr.Reader(["ru", "en"], gpu=(DEVICE == "cuda"))
 
     def parse_file(self, file_path: str) -> Dict[str, Any]:
         """
         Извлечение текста и метаданных из PDF-файла.
         """
         content = ""
-        meta = {}
 
         with fitz.open(file_path) as document:
             meta = document.metadata
@@ -213,7 +218,7 @@ class LocalEmbedder:
         """
         Инициализация эмбеддера.
         """
-        self.model = SentenceTransformer(model)
+        self.model = SentenceTransformer(model, device=DEVICE)
 
     def encode(self, texts: List[str]) -> List[List[float]]:
         """
@@ -224,7 +229,8 @@ class LocalEmbedder:
             batch_size=32,
             show_progress_bar=False,
             convert_to_numpy=True,
-            normalize_embeddings=True
+            normalize_embeddings=True,
+            device=DEVICE
         )
 
         return embeddings.tolist()
@@ -375,11 +381,11 @@ class IndexBuilder:
 
 if __name__ == "__main__":
     # Конфигурация и запуск индексации
-    scanner = PdfScanner(folder="../data")
+    scanner = PdfScanner(folder=DATA_FOLDER)
     parser = PdfParser(use_ocr=True)
     chunker = TextChunker(size=800, overlap=150)
-    embedder = LocalEmbedder()
-    uploader = QdrantUploader(collection_name="papers_index")
+    embedder = LocalEmbedder(model=EMBEDDING_MODEL)
+    uploader = QdrantUploader(collection_name=QDRANT_COLLECTION, url=QDRANT_URL)
 
     builder = IndexBuilder(scanner, parser, chunker, embedder, uploader)
     builder.run()

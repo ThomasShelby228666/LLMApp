@@ -1,40 +1,44 @@
-import json
-import re
 from typing import List, Dict, Any, Optional
 from vector_store import VectorStore
-from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+from transformers import pipeline
 from build_index import LocalEmbedder
-import time
+import sys
+from pathlib import Path
+import torch
+
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
+from config import QDRANT_COLLECTION, QDRANT_URL, LLM_MODEL, EMBEDDING_MODEL, DEVICE
 
 class RAGChain:
     """
-
+    Класс объединяет векторный поиск в Qdrant и генерацию ответов с помощью LLM.
     """
-    def __init__(self, collection_name,  llm_model="Qwen/Qwen2.5-1.5B-Instruct", qdrant_url="http://localhost:6333"):
+    def __init__(self, collection_name=QDRANT_COLLECTION,  llm_model=LLM_MODEL, qdrant_url=QDRANT_URL):
         """
-
-        :param collection_name:
-        :param qdrant_url:
-        :param embedding_model:
-        :param llm_config:
+        Инициализация RAG цепочки.
         """
         self.collection_name = collection_name
         self.vector_store = VectorStore(collection_name, url=qdrant_url)
-        self.embedding_model = LocalEmbedder()
-        self.llm = pipeline("text-generation", model=llm_model)
-
+        self.embedding_model = LocalEmbedder(model=EMBEDDING_MODEL)
+        self.llm = pipeline(
+            "text-generation",
+            model=llm_model,
+            device=DEVICE,
+            model_kwargs={
+            "dtype": torch.float16,
+            "low_cpu_mem_usage": True
+        })
 
     def ask_rag(self, question, filters=None, top_k=5):
         """
-
-        :param question:
-        :param filters:
-        :return:
+        Основной метод RAG: задать вопрос и получить ответ с источниками.
         """
-        query_vector = self.embedding_model.encode([question])[0].tolist()
+        query_vector = self.embedding_model.encode([question])[0]
 
         chunks = self.vector_store.search_vectors(
-            collection_name=self.collection_name,
+           # collection_name=self.collection_name,
             query_vector=query_vector,
             filter=filters,
             top_k=top_k
@@ -80,6 +84,9 @@ class RAGChain:
         }
 
     def _build_prompt(self, context, question):
+        """
+        Формирует промпт для LLM.
+        """
         return f"""Ты — помощник-исследователь. Твоя задача: ответить на вопрос, используя ТОЛЬКО предоставленный контекст.
         Если ответа в тексте нет, напиши "Информация не найдена".
     
@@ -101,6 +108,9 @@ class RAGChain:
 
 
     def _calculate_confidence(self, chunks):
+        """
+        Вычисляет уровень уверенности в ответе на основе оценок релевантности.
+        """
         if not chunks:
             return "low"
         avg_score = sum(chunk.score for chunk in chunks) / len(chunks)
@@ -109,3 +119,23 @@ class RAGChain:
         elif avg_score > 0.5:
             return "medium"
         return "low"
+
+if __name__ == "__main__":
+    # Точка входа для интерактивного чата с RAG системой.
+    rag = RAGChain(QDRANT_COLLECTION)
+    print("RAG-чат запущен (введите /exit для выхода)")
+
+    while True:
+        q = input("Введите запрос: ").strip()
+        if q in ["/exit", "quit", "выход"]:
+            break
+        if not q:
+            continue
+
+        res = rag.ask_rag(q)
+        print(f"\n{res['answer']}")
+        if res["citations"]:
+            print("\nИсточники:")
+            for i, c in enumerate(res["citations"], 1):
+                print(f"{i}. {c['authors']} ({c['year']}) — {c['snippet'][:100]}...")
+        print(f"[{res['confidence']}]")
