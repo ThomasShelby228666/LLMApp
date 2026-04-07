@@ -131,6 +131,13 @@ class PdfParser:
         if journal_match and not meta.get("journal"):
             meta["journal"] = journal_match.group(1).strip()
 
+        meta.update({
+            "authors": meta.get("author", ""),
+            "title": meta.get("title"),
+            "section": "Abstract",
+            "page": 1,
+        })
+
         return meta
 
 
@@ -248,7 +255,9 @@ class QdrantUploader:
         for text, meta in zip(chunks, metadata_list):
             uid = hashlib.md5((text + meta.get("source_path", "")).encode()).hexdigest()
             ids.append(uid)
-            payloads.append({"text": text, **meta})
+            payload = {"text": text}
+            payload.update({k: v for k, v in meta.items() if v})
+            payloads.append(payload)
 
         self.store.upload_vectors(vectors=vectors, payloads=payloads, ids=ids)
         return True

@@ -64,12 +64,14 @@ class VectorStore:
         #     query_filter=filter,
         #     limit=top_k
         # )
-        return self.client.query_points(
+        results = self.client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
             query_filter=filter,
-            limit=top_k
+            limit=top_k,
+            with_payload=True
         )
+        return results.points
 
 if __name__ == "__main__":
     # Тестовые данные
