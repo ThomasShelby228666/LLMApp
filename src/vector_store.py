@@ -2,6 +2,13 @@ import qdrant_client
 from qdrant_client import models
 from typing import List, Optional, Dict, Any
 from qdrant_client.http.models import Distance
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+
+from config import QDRANT_API_KEY
 
 class VectorStore:
     """
@@ -11,7 +18,6 @@ class VectorStore:
     def __init__(
             self,
             collection_name: str,
-            api_key: Optional[str] = None,
             url: str = "http://localhost:6333"
     ) -> None:
         """
@@ -19,7 +25,7 @@ class VectorStore:
         """
         self.client = qdrant_client.QdrantClient(
             url=url,
-            api_key=api_key if api_key else None
+            api_key=QDRANT_API_KEY if QDRANT_API_KEY else None
         )
         self.collection_name = collection_name
 
@@ -107,8 +113,7 @@ if __name__ == "__main__":
     query = [0.15, 0.25, 0.35, 0.45]
     print(f" Поиск по запросу {query}.")
 
-    response = store.search_vectors(query_vector=query, top_k=2)
-    results = response.points
+    results = store.search_vectors(query_vector=query, top_k=2)
 
     print(f"Найдено результатов: {len(results)}")
     for r in results:
@@ -122,12 +127,11 @@ if __name__ == "__main__":
         must=[models.FieldCondition(key="tag", match=models.MatchValue(value="b"))]
     )
 
-    responce_filtered = store.search_vectors(
+    results_filtered = store.search_vectors(
         query_vector=query,
         filter=filter_query,
         top_k=5
     )
-    results_filtered = responce_filtered.points
 
     for r in results_filtered:
         print(f"   ID: {r.id} | Score: {r.score:.4f} | Payload: {r.payload}")
