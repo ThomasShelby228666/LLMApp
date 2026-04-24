@@ -191,7 +191,7 @@ class RAGChain:
 if __name__ == "__main__":
     # Точка входа для интерактивного чата с RAG системой.
     rag = RAGChain(QDRANT_COLLECTION)
-    print("RAG-чат запущен (введите /exit для выхода)")
+    print("Чат запущен (введите /exit для выхода)")
 
     while True:
         q = input("Введите запрос: ").strip()
