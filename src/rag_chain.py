@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from vector_store import VectorStore
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer
 from build_index import LocalEmbedder
 import sys
 from pathlib import Path
@@ -15,13 +15,24 @@ class RAGChain:
     """
     Класс объединяет векторный поиск в Qdrant и генерацию ответов с помощью LLM.
     """
-    def __init__(self, collection_name=QDRANT_COLLECTION,  llm_model=LLM_MODEL, qdrant_url=QDRANT_URL):
+    def __init__(
+            self,
+            collection_name: str = QDRANT_COLLECTION,
+            llm_model: str = LLM_MODEL,
+            qdrant_url: str = QDRANT_URL
+    ) -> None:
         """
         Инициализация RAG цепочки.
         """
         self.collection_name = collection_name
         self.vector_store = VectorStore(collection_name, url=qdrant_url)
         self.embedding_model = LocalEmbedder(model=EMBEDDING_MODEL)
+
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(llm_model)
+        except:
+            self.tokenizer = None
+
         self.llm = pipeline(
             "text-generation",
             model=llm_model,
@@ -31,7 +42,12 @@ class RAGChain:
             "low_cpu_mem_usage": True
         })
 
-    def ask_rag(self, question, filters=None, top_k=5):
+    def ask_rag(
+            self,
+            question: str,
+            filters: Optional[Any] = None,
+            top_k: int = 3
+    ) -> Dict[str, Any]:
         """
         Основной метод RAG: задать вопрос и получить ответ с источниками.
         """
@@ -67,13 +83,21 @@ class RAGChain:
         context_text = "\n".join([f"[{i + 1}] {chunk.payload.get('text', '')}" for i, chunk in enumerate(chunks)])
         prompt = self._build_prompt(context_text, question)
 
-        raw_output = self.llm(prompt, max_new_tokens=512, do_sample=False)
+        raw_output = self.llm(
+            prompt,
+            max_new_tokens=256,
+            do_sample=False,
+            return_full_text=False,
+            pad_token_id=self.tokenizer.eos_token_id if self.tokenizer else 0
+        )
 
         if isinstance(raw_output, list):
             generated_text = raw_output[0]["generated_text"]
-            answer_text = generated_text.replace(prompt, "").strip()
+            # answer_text = generated_text.replace(prompt, "").strip()
         else:
-            answer_text = raw_output
+            generated_text = raw_output
+
+        answer_text = self._clean_answer(generated_text)
 
         confidence = self._calculate_confidence(chunks)
 
@@ -83,7 +107,40 @@ class RAGChain:
             "confidence": confidence
         }
 
-    def _build_prompt(self, context, question):
+    def _clean_answer(self, text: str) -> str:
+        """
+        Удаляет хвосты генерации, где модель начинает придумывать новые вопросы.
+        """
+        if not text:
+            return ""
+
+        stop_markers = [
+            "\n\nВОПРОС:",
+            "\nВОПРОС:",
+            "\n\nQuestion:",
+            "\nQuestion:",
+            "\n\n### ВОПРОС:",
+            "<|user|>",
+            "<|start_header_id|>user"
+        ]
+
+        min_index = len(text)
+        for marker in stop_markers:
+            idx = text.find(marker)
+            if idx != -1 and idx < min_index:
+                min_index = idx
+
+        if min_index < len(text):
+            text = text[:min_index]
+
+        text = text.strip()
+
+        if text.upper().startswith("ОТВЕТ:"):
+            text = text[len("ОТВЕТ:"):].strip()
+
+        return text
+
+    def _build_prompt(self, context: str, question: str) -> str:
         """
         Формирует промпт для LLM.
         """
@@ -97,8 +154,18 @@ class RAGChain:
         # {question}
         #
         # ### ОТВЕТ (кратко, по делу):"""
-        return f"""Ты — научный ассистент. Ответь кратко на вопрос, используя ТОЛЬКО текст ниже.
-        Если ответа нет, так и скажи.
+        # return f"""Ты — научный ассистент. Ответь кратко на вопрос, используя ТОЛЬКО текст ниже.
+        # Если ответа нет, так и скажи.
+        #
+        # КОНТЕКСТ:
+        # {context}
+        #
+        # ВОПРОС: {question}
+        #
+        # ОТВЕТ:"""
+        #
+        prompt = f"""Ты — научный ассистент. Ответь кратко на вопрос, используя ТОЛЬКО текст ниже.
+        Если ответа нет, так и скажи: "Информация не найдена".
 
         КОНТЕКСТ:
         {context}
@@ -106,8 +173,9 @@ class RAGChain:
         ВОПРОС: {question}
 
         ОТВЕТ:"""
+        return prompt
 
-    def _calculate_confidence(self, chunks):
+    def _calculate_confidence(self, chunks: List[Any]) -> str:
         """
         Вычисляет уровень уверенности в ответе на основе оценок релевантности.
         """
