@@ -54,8 +54,8 @@ class RAGChain:
         citations = [
             {
                 "source": chunk.payload.get("source_path", ""),
-                "authors": chunk.payload.get("authors", ""),
-                "year": chunk.payload.get("year"),
+                "authors": chunk.payload.get("authors", "") or "Автор неизвестен",
+                "year": chunk.payload.get("year") or "г.н.",
                 "journal": chunk.payload.get("journal", ""),
                 "page": chunk.payload.get("page"),
                 "doi": chunk.payload.get("doi", ""),
@@ -70,7 +70,7 @@ class RAGChain:
         raw_output = self.llm(prompt, max_new_tokens=512, do_sample=False)
 
         if isinstance(raw_output, list):
-            generated_text = raw_output[0]['generated_text']
+            generated_text = raw_output[0]["generated_text"]
             answer_text = generated_text.replace(prompt, "").strip()
         else:
             answer_text = raw_output
@@ -87,25 +87,25 @@ class RAGChain:
         """
         Формирует промпт для LLM.
         """
-        return f"""Ты — помощник-исследователь. Твоя задача: ответить на вопрос, используя ТОЛЬКО предоставленный контекст.
-        Если ответа в тексте нет, напиши "Информация не найдена".
-    
-        ### КОНТЕКСТ:
-        {context}
-    
-        ### ВОПРОС:
-        {question}
-    
-        ### ИНСТРУКЦИЯ:
-        Ответь в формате JSON:
-        {{
-          "answer": "текст ответа со ссылками на источники в формате [1], [2]",
-          "citations": [
-            {{"id": 1, "source": "название/автор", "page": "номер или null"}}
-          ]
-        }}
-        JSON:"""
+        # return f"""Ты — помощник-исследователь. Твоя задача: ответить на вопрос, используя ТОЛЬКО предоставленный контекст.
+        # Если ответа в тексте нет, напиши "Информация не найдена".
+        #
+        # ### КОНТЕКСТ:
+        # {context}
+        #
+        # ### ВОПРОС:
+        # {question}
+        #
+        # ### ОТВЕТ (кратко, по делу):"""
+        return f"""Ты — научный ассистент. Ответь кратко на вопрос, используя ТОЛЬКО текст ниже.
+        Если ответа нет, так и скажи.
 
+        КОНТЕКСТ:
+        {context}
+
+        ВОПРОС: {question}
+
+        ОТВЕТ:"""
 
     def _calculate_confidence(self, chunks):
         """
